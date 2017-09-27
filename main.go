@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/csv"
 	"flag"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -29,9 +30,18 @@ func newRecord(r []string, mod int) (*record, error) {
 	if err != nil {
 		return nil, err
 	}
-	RouteCount = RouteCount - mod
-	BundlePerRoute := RouteCount / BundleCount
-	LastBundle := RouteCount - (BundleCount * BundlePerRoute)
+	RouteCount = RouteCount + mod
+
+	var BundlePerRoute int
+	var LastBundle int
+
+	if RouteCount%BundleCount == 0 {
+		BundlePerRoute = RouteCount / BundleCount
+		LastBundle = BundleCount
+	} else {
+		BundlePerRoute = (RouteCount / BundleCount) + 1
+		LastBundle = RouteCount - (BundleCount * (BundlePerRoute - 1))
+	}
 
 	return &record{
 		City:           r[0],
@@ -47,7 +57,8 @@ func newRecord(r []string, mod int) (*record, error) {
 
 func main() {
 	var (
-		mod = flag.Int("mod", 0, "Modify RouteCount qty")
+		mrc     = flag.Int("mrc", 0, "Modify RouteCount number (defaults to 0)")
+		outfile = flag.String("output", "output.csv", "Filename to export the CSV results")
 	)
 	flag.Parse()
 
@@ -66,6 +77,13 @@ func main() {
 
 	r := csv.NewReader(os.Stdin)
 
+	of, err := os.Create(*outfile)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	defer of.Close()
+	w := csv.NewWriter(of)
+
 	for counter := 0; ; counter++ {
 		rec, err := r.Read()
 		if err == io.EOF {
@@ -75,13 +93,11 @@ func main() {
 			log.Fatalln(err)
 		}
 
-		w := csv.NewWriter(os.Stdout)
-
 		if counter == 0 {
 			w.Write(header)
 			w.Flush()
 		} else {
-			r, err := newRecord(rec, *mod)
+			r, err := newRecord(rec, *mrc)
 			if err != nil {
 				log.Fatalln(err)
 			}
@@ -120,4 +136,5 @@ func main() {
 			w.Flush()
 		}
 	}
+	fmt.Println("Job Completed!")
 }
