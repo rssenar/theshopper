@@ -2,13 +2,14 @@ package main
 
 import (
 	"encoding/csv"
+	"flag"
 	"io"
 	"log"
 	"os"
 	"strconv"
 )
 
-type field struct {
+type record struct {
 	City           string
 	State          string
 	Zip            string
@@ -22,21 +23,17 @@ type field struct {
 	Count          string
 }
 
-func (f *field) valdiate() {
-	if !(f.BundleCount*(f.BundlePerRoute-1)+f.LastBundle == f.RouteCount) {
-		log.Fatalln("Invalid Formula")
-	}
-}
-
-func parseField(r []string) (*field, error) {
+func newRecord(r []string, mod int) (*record, error) {
 	RouteCount, err := strconv.Atoi(r[4])
 	BundleCount, err := strconv.Atoi(r[5])
-	BundlePerRoute, err := strconv.Atoi(r[6])
-	LastBundle, err := strconv.Atoi(r[7])
 	if err != nil {
 		return nil, err
 	}
-	return &field{
+	RouteCount = RouteCount - mod
+	BundlePerRoute := RouteCount / BundleCount
+	LastBundle := RouteCount - (BundleCount * BundlePerRoute)
+
+	return &record{
 		City:           r[0],
 		State:          r[1],
 		Zip:            r[2],
@@ -48,24 +45,35 @@ func parseField(r []string) (*field, error) {
 	}, nil
 }
 
-// helper function to check and handle errors
-func check(e error) {
-	if e != nil {
-		log.Fatalln(e)
-	}
-}
-
 func main() {
-	header := []string{"City", "State", "Zip", "Crrt", "RouteCount", "BundleCount", "BundlePerRoute", "LastBundle", "SeqNum", "FinalBundles", "Count"}
+	var (
+		mod = flag.Int("mod", 0, "Modify RouteCount qty")
+	)
+	flag.Parse()
+
+	header := []string{"City",
+		"State",
+		"Zip",
+		"Crrt",
+		"RouteCount",
+		"BundleCount",
+		"BundlePerRoute",
+		"LastBundle",
+		"SeqNum",
+		"FinalBundles",
+		"Count",
+	}
 
 	r := csv.NewReader(os.Stdin)
 
 	for counter := 0; ; counter++ {
-		record, err := r.Read()
+		rec, err := r.Read()
 		if err == io.EOF {
 			break
 		}
-		check(err)
+		if err != nil {
+			log.Fatalln(err)
+		}
 
 		w := csv.NewWriter(os.Stdout)
 
@@ -73,9 +81,10 @@ func main() {
 			w.Write(header)
 			w.Flush()
 		} else {
-			r, err := parseField(record)
-			check(err)
-			r.valdiate()
+			r, err := newRecord(rec, *mod)
+			if err != nil {
+				log.Fatalln(err)
+			}
 
 			for bndl := 1; bndl < r.BundlePerRoute; bndl++ {
 				r.SeqNum = bndl
@@ -93,6 +102,7 @@ func main() {
 					strconv.Itoa(r.SeqNum) + "_of_" + strconv.Itoa(r.BundlePerRoute),
 				})
 				w.Flush()
+				r.SeqNum++
 			}
 			w.Write([]string{
 				r.City,
@@ -103,9 +113,9 @@ func main() {
 				strconv.Itoa(r.BundleCount),
 				strconv.Itoa(r.BundlePerRoute),
 				strconv.Itoa(r.LastBundle),
-				strconv.Itoa(r.SeqNum + 1),
+				strconv.Itoa(r.SeqNum),
 				strconv.Itoa(r.LastBundle),
-				strconv.Itoa(r.SeqNum+1) + "_of_" + strconv.Itoa(r.BundlePerRoute),
+				strconv.Itoa(r.SeqNum) + "_of_" + strconv.Itoa(r.BundlePerRoute),
 			})
 			w.Flush()
 		}
