@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 )
 
 type record struct {
@@ -24,21 +25,38 @@ type record struct {
 	Count          string
 }
 
-func newRecord(r []string, mod int) (*record, error) {
-	RouteCount, err := strconv.Atoi(r[4])
-	BundleCount, err := strconv.Atoi(r[5])
-	if err != nil {
-		return nil, err
+func remSep(p string) string {
+	sep := []string{"-", ".", "*", "(", ")", ",", "\"", " "}
+	for _, v := range sep {
+		p = strings.Replace(p, v, "", -1)
 	}
-	RouteCount = RouteCount + mod
+	return p
+}
+
+func newRecord(r []string, mrc int) (*record, error) {
+	RouteCount, err := strconv.Atoi(remSep(r[4]))
+	if err != nil {
+		return nil, fmt.Errorf("Error parsing RouteCount :: %s", err)
+	}
+
+	BundleCount, err := strconv.Atoi(remSep(r[5]))
+	if err != nil {
+		return nil, fmt.Errorf("Error parsing BundleCount :: %s", err)
+	}
+
+	RouteCount = RouteCount + mrc
+	if RouteCount <= 0 {
+		return nil, fmt.Errorf("RouteCount Cannot be <= 0")
+	}
 
 	var BundlePerRoute int
 	var LastBundle int
 
-	if RouteCount%BundleCount == 0 {
+	switch {
+	case RouteCount%BundleCount == 0:
 		BundlePerRoute = RouteCount / BundleCount
 		LastBundle = BundleCount
-	} else {
+	default:
 		BundlePerRoute = (RouteCount / BundleCount) + 1
 		LastBundle = RouteCount - (BundleCount * (BundlePerRoute - 1))
 	}
@@ -99,7 +117,7 @@ func main() {
 		} else {
 			r, err := newRecord(rec, *mrc)
 			if err != nil {
-				log.Fatalln(err)
+				log.Fatalf("%v on row [%v]", err, counter)
 			}
 
 			for bndl := 1; bndl < r.BundlePerRoute; bndl++ {
@@ -109,13 +127,13 @@ func main() {
 					r.State,
 					r.Zip,
 					r.Crrt,
-					strconv.Itoa(r.RouteCount),
-					strconv.Itoa(r.BundleCount),
-					strconv.Itoa(r.BundlePerRoute),
-					strconv.Itoa(r.LastBundle),
-					strconv.Itoa(r.SeqNum),
-					strconv.Itoa(r.BundleCount),
-					strconv.Itoa(r.SeqNum) + "_of_" + strconv.Itoa(r.BundlePerRoute),
+					fmt.Sprint(r.RouteCount),
+					fmt.Sprint(r.BundleCount),
+					fmt.Sprint(r.BundlePerRoute),
+					fmt.Sprint(r.LastBundle),
+					fmt.Sprint(r.SeqNum),
+					fmt.Sprint(r.BundleCount),
+					fmt.Sprintf("%v_of_%v", r.SeqNum, r.BundlePerRoute),
 				})
 				w.Flush()
 				r.SeqNum++
@@ -125,13 +143,13 @@ func main() {
 				r.State,
 				r.Zip,
 				r.Crrt,
-				strconv.Itoa(r.RouteCount),
-				strconv.Itoa(r.BundleCount),
-				strconv.Itoa(r.BundlePerRoute),
-				strconv.Itoa(r.LastBundle),
-				strconv.Itoa(r.SeqNum),
-				strconv.Itoa(r.LastBundle),
-				strconv.Itoa(r.SeqNum) + "_of_" + strconv.Itoa(r.BundlePerRoute),
+				fmt.Sprint(r.RouteCount),
+				fmt.Sprint(r.BundleCount),
+				fmt.Sprint(r.BundlePerRoute),
+				fmt.Sprint(r.LastBundle),
+				fmt.Sprint(r.SeqNum),
+				fmt.Sprint(r.LastBundle),
+				fmt.Sprintf("%v_of_%v", r.SeqNum, r.BundlePerRoute),
 			})
 			w.Flush()
 		}
