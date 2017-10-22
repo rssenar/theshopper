@@ -19,49 +19,6 @@ type record struct {
 	BundleCount    int
 	BundlePerRoute int
 	LastBundle     int
-	SeqNum         int
-	FinalBundles   int
-	Count          string
-}
-
-func main() {
-	var (
-		mrc     = flag.Int("mrc", 0, "Modify RouteCount number (defaults to 0)")
-		outfile = flag.String("output", "output.csv", "Filename to export the CSV results")
-	)
-	flag.Parse()
-
-	var counter int
-	records := make(chan *record)
-
-	go func() {
-		input, err := os.Open(os.Args[len(os.Args)-1])
-		if err != nil {
-			log.Fatalln(err)
-		}
-		r := csv.NewReader(input)
-
-		allRecs, err := r.ReadAll()
-		if err != nil {
-			log.Fatalln(err)
-		}
-		for idx, rec := range allRecs {
-			if idx == 0 {
-				continue
-			}
-			record, err := newRecord(rec, *mrc)
-			if err != nil {
-				log.Fatalf("%v on row [%v]\n", err, counter)
-			}
-			records <- record
-		}
-		close(records)
-	}()
-
-	if err := csvOutput(records, *outfile); err != nil {
-		log.Printf("could not write to %s: %v", *outfile, err)
-	}
-	fmt.Println("Done!")
 }
 
 func newRecord(r []string, mrc int) (*record, error) {
@@ -102,14 +59,14 @@ func newRecord(r []string, mrc int) (*record, error) {
 func csvOutput(rec <-chan *record, outfile string) error {
 	outputFile, err := os.Create(outfile)
 	if err != nil {
-		log.Fatalln(err)
+		return fmt.Errorf("Cannot create output file: %v", err)
 	}
 	defer outputFile.Close()
 	w := csv.NewWriter(outputFile)
 
 	header := []string{"City", "State", "Zip", "Crrt", "RouteCount", "BundleCount", "BundlePerRoute", "LastBundle", "SeqNum", "FinalBundles", "Count"}
 	if err := w.Write(header); err != nil {
-		log.Fatalf("error writing record to csv: %v", err)
+		return fmt.Errorf("error writing header record to csv: %v", err)
 	}
 
 	for r := range rec {
@@ -141,4 +98,44 @@ func remSep(p string) string {
 		p = strings.Replace(p, v, "", -1)
 	}
 	return p
+}
+
+func main() {
+	var (
+		mrc     = flag.Int("mrc", 0, "Modify RouteCount number (defaults to 0)")
+		outfile = flag.String("output", "output.csv", "Filename to export the CSV results")
+	)
+	flag.Parse()
+
+	var counter int
+	records := make(chan *record)
+
+	go func() {
+		input, err := os.Open(os.Args[len(os.Args)-1])
+		if err != nil {
+			log.Fatalln(err)
+		}
+		r := csv.NewReader(input)
+
+		allRecs, err := r.ReadAll()
+		if err != nil {
+			log.Fatalln(err)
+		}
+		for idx, rec := range allRecs {
+			if idx == 0 {
+				continue
+			}
+			record, err := newRecord(rec, *mrc)
+			if err != nil {
+				log.Fatalf("%v on row [%v]\n", err, counter)
+			}
+			records <- record
+		}
+		close(records)
+	}()
+
+	if err := csvOutput(records, *outfile); err != nil {
+		log.Printf("could not write to %s: %v", *outfile, err)
+	}
+	fmt.Println("Done!")
 }
